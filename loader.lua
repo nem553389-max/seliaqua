@@ -1,57 +1,32 @@
--- [[ Seliaqua Hub - Sailor Piece Auto Farm Level ]] --
+-- [[ Seliaqua Hub - Sailor Piece Script Source ]] --
 
-local VirtualUser = game:GetService("VirtualUser")
-local Player = game.Players.LocalPlayer
-
--- 1. ระบบกันหลุด (Anti-AFK)
-Player.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
-end)
-
--- 2. โหลด UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
 local Window = Library.CreateLib("★ Seliaqua Hub ★", "DarkTheme")
 
--- 3. ตัวแปรระบบ
+-- Variables
+local Player = game.Players.LocalPlayer
+local VirtualUser = game:GetService("VirtualUser")
 _G.AutoFarm = false
-_G.AutoSkills = false
+_G.KillAura = false
+_G.AutoStats = false
+_G.StatsToUp = "Strength"
 _G.Distance = 8
-_G.WeaponType = "Melee" -- ค่าเริ่มต้นเป็นหมัด
 
--- 4. ฟังก์ชันรับเควสอัตโนมัติ (หัวใจหลักจากในคลิป)
-local function CheckQuest()
-    local level = Player.Data.Level.Value
-    -- ใส่ระบบเช็คเลเวลเพื่อรับเควสที่เหมาะสม (ตัวอย่างคร่าวๆ ตามเกาะแรก)
-    if level >= 1 and level < 50 then
-        return "Quest1"
-    elseif level >= 50 and level < 100 then
-        return "Quest2"
-    end
-    -- คุณสามารถเพิ่มเงื่อนไขตามเควสในแมพจริงได้ที่นี่
-end
-
--- 5. ระบบวาร์ปและตี (Fast Farm)
+-- [ 1. ฟังก์ชัน Auto Farm ] --
 task.spawn(function()
     while task.wait() do
         if _G.AutoFarm then
             pcall(function()
-                -- ค้นหาศัตรูที่ใกล้ที่สุด
                 local Target = nil
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v:FindFirstChild("HumanoidRootPart") then
-                        if v.Name ~= Player.Name and not game.Players:GetPlayerFromCharacter(v) then
-                            Target = v
-                            break
-                        end
+                for _, v in pairs(workspace.Enemies:GetChildren()) do
+                    if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                        Target = v
+                        break
                     end
                 end
-
+                
                 if Target then
-                    -- วาร์ปไปล็อคตำแหน่ง (ฟาร์มเร็วมากแบบในคลิป)
                     Player.Character.HumanoidRootPart.CFrame = Target.HumanoidRootPart.CFrame * CFrame.new(0, _G.Distance, 0) * CFrame.Angles(math.rad(-90), 0, 0)
-                    
-                    -- กดตีอัตโนมัติ
                     VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
                 end
             end)
@@ -59,17 +34,58 @@ task.spawn(function()
     end
 end)
 
--- 6. ระบบใช้สกิลอัตโนมัติ (Z, X, C, V)
+-- [ 2. ฟังก์ชัน Kill Aura (ดาเมจรอบตัว) ] --
 task.spawn(function()
-    while task.wait(1) do
-        if _G.AutoSkills and _G.AutoFarm then
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendKeyEvent(true, "Z", false, game)
-            vim:SendKeyEvent(true, "X", false, game)
-            vim:SendKeyEvent(true, "C", false, game)
-            vim:SendKeyEvent(true, "V", false, game)
+    while task.wait(0.1) do
+        if _G.KillAura then
+            pcall(function()
+                for _, v in pairs(workspace.Enemies:GetChildren()) do
+                    if (v.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude <= 25 then
+                        -- จำลองการโจมตี (เรียกใช้ Remote ตามโครงสร้าง scripts.js)
+                        game:GetService("ReplicatedStorage").Events.Attack:FireServer()
+                    end
+                end
+            end)
         end
     end
 end)
 
--- 7. เม
+-- [ 3. ฟังก์ชัน Auto Stats (อัพค่าพลังอัตโนมัติ) ] --
+task.spawn(function()
+    while task.wait(1) do
+        if _G.AutoStats then
+            game:GetService("ReplicatedStorage").Events.StatsUpgrade:FireServer(_G.StatsToUp)
+        end
+    end
+end)
+
+-- [[ UI TABS ]] --
+
+local Main = Window:NewTab("ฟาร์มหลัก")
+local Section = Main:NewSection("Auto Farming")
+
+Section:NewToggle("เริ่มออโต้ฟาร์ม", "วาร์ปไปตีมอนสเตอร์", function(state)
+    _G.AutoFarm = state
+end)
+
+Section:NewToggle("คิลออร่า (Kill Aura)", "ตีมอนสเตอร์รอบตัว", function(state)
+    _G.KillAura = state
+end)
+
+local StatsTab = Window:NewTab("อัพสถานะ")
+local StatsSection = StatsTab:NewSection("Auto Stats")
+
+StatsSection:NewDropdown("เลือกค่าที่จะอัพ", "เลือก Strength/Stamina/ฯลฯ", {"Strength", "Defense", "Stamina", "Sword", "Fruit"}, function(current)
+    _G.StatsToUp = current
+end)
+
+StatsSection:NewToggle("เปิดออโต้สเตตัส", "อัพสเตตัสให้อัตโนมัติ", function(state)
+    _G.AutoStats = state
+end)
+
+local Settings = Window:NewTab("ตั้งค่า")
+Settings:NewSection("System"):NewKeybind("ซ่อนเมนู (F)", "กด F เพื่อซ่อน", Enum.KeyCode.F, function()
+    Library:ToggleLib()
+end)
+
+print("★ Seliaqua Hub: Source Merged Successfully! ★")
